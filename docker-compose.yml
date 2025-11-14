@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/
+    ports:
+      - "${DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PG_ADMIN_LOGIN}
+      - PGADMIN_DEFAULT_PASSWORD=${PG_ADMIN_PASSWORD}
+    ports:
+      - "${PGADMIN_PORT}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  back-service-electronic-shop:
+    build:
+      context: .
+      dockerfile: docker-files/Go.Dockerfile
+      args:
+        MODULE_PATH: ${MODULE_PATH}
+        SERVICE_PATH: ${SERVICE_PATH}
+    ports:
+      - "${BACK_SERVICE_ELECTRONIC_SHOP_PORT}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  db_data:
